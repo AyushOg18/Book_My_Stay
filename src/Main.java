@@ -1,56 +1,94 @@
-import java.util.Scanner;
+import java.util.*;
 
-// Custom Exception for specific domain errors
-class BookingValidationException extends Exception {
-    public BookingValidationException(String message) {
-        super(message);
+// Service to handle the Rollback logic
+class CancellationService {
+    private RoomInventory inventory;
+    private BookingHistory history;
+
+    public CancellationService(RoomInventory inventory, BookingHistory history) {
+        this.inventory = inventory;
+        this.history = history;
+    }
+
+    // Step 2: Validate and Process Cancellation
+    public void processCancellation(String resId) {
+        System.out.println("\nInitiating Cancellation for: " + resId);
+
+        // Find the reservation in history
+        Reservation target = findReservation(resId);
+
+        if (target != null) {
+            // Step 3: Record details for rollback (Already in 'target' object)
+            String roomType = target.roomType;
+            String roomId = target.roomId;
+
+            // Step 4: Increment Inventory (Rollback the decrement from UC 6)
+            inventory.updateAvailability(roomType, 1);
+            System.out.println("Rollback: Inventory for " + roomType + " incremented (+1).");
+
+            // Step 5: Update history state
+            target.status = "CANCELLED"; // Assuming status field added to Reservation
+            System.out.println("Success: Room " + roomId + " is now vacant.");
+        } else {
+            // Step 3 (Error Path): Meaningful failure message
+            System.out.println("Error: Cancellation failed. Reservation ID " + resId + " not found.");
+        }
+    }
+
+    private Reservation findReservation(String resId) {
+        for (Reservation res : history.getAllRecords()) {
+            if (res.reservationId.equals(resId)) {
+                return res;
+            }
+        }
+        return null;
     }
 }
 
-// Validator Service - Acts as a Gatekeeper
-class BookingValidator {
+// Updated Reservation Class to support state tracking
+class Reservation {
+    String reservationId;
+    String guestName;
+    String roomType;
+    String roomId;
+    String status; // New field for UC 10
 
-    public static void validateRequest(String guestName, int nights, int availability)
-            throws BookingValidationException {
+    public Reservation(String guestName, String roomType, String roomId) {
+        this.reservationId = "RES-" + UUID.randomUUID().toString().substring(0, 5).toUpperCase();
+        this.guestName = guestName;
+        this.roomType = roomType;
+        this.roomId = roomId;
+        this.status = "CONFIRMED";
+    }
 
-        // 1. Validate Input Values
-        if (guestName == null || guestName.trim().isEmpty()) {
-            throw new BookingValidationException("Error: Guest name cannot be empty.");
-        }
-
-        if (nights <= 0) {
-            throw new BookingValidationException("Error: Stay duration must be at least 1 night.");
-        }
-
-        // 2. Validate System Constraints
-        if (availability <= 0) {
-            throw new BookingValidationException("Error: Selected room type is currently Sold Out.");
-        }
+    @Override
+    public String toString() {
+        return String.format("[%s] %s | Room: %s (%s)", status, reservationId, roomId, roomType);
     }
 }
 
 public class BookMyStayApp {
     public static void main(String[] args) {
-        // Mock Data for testing
-        String inputName = ""; // Invalid
-        int inputNights = -2;  // Invalid
-        int currentAvailability = 0; // Sold Out
+        // Setup initial system state
+        RoomInventory inventory = new RoomInventory();
+        inventory.registerRoom("Deluxe", 2);
+        BookingHistory history = new BookingHistory();
 
-        System.out.println("--- Initiating Booking Validation ---");
+        // Simulate a confirmed booking
+        Reservation res = new Reservation("John Doe", "Deluxe", "D101");
+        history.recordReservation(res);
+        inventory.updateAvailability("Deluxe", -1); // Room was taken
 
-        try {
-            // Step 2: System validates input values and constraints
-            BookingValidator.validateRequest(inputName, inputNights, currentAvailability);
+        System.out.println("Initial State:");
+        inventory.displayInventory();
 
-            // This part only runs if validation passes
-            System.out.println("Validation Passed! Proceeding to Queue...");
+        // UC 10 Flow: Guest cancels
+        CancellationService cancelService = new CancellationService(inventory, history);
+        cancelService.processCancellation(res.reservationId);
 
-        } catch (BookingValidationException e) {
-            // Step 3 & 4: Error is raised and meaningful message is displayed
-            System.err.println("VALIDATION FAILED: " + e.getMessage());
-        }
-
-        // Step 5: System continues running safely
-        System.out.println("\nSystem Status: Online. Ready for next request.");
+        // Step 6: Verify restored state
+        System.out.println("\nRestored State:");
+        inventory.displayInventory();
+        System.out.println("History: " + res);
     }
 }
