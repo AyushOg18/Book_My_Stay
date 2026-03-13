@@ -1,59 +1,73 @@
 import java.util.HashMap;
 import java.util.Map;
 
-// The Centralized Inventory Manager
-class RoomInventory {
-    // Key: Room Type (String), Value: Count (Integer)
-    private HashMap<String, Integer> inventory;
+// Base Room class from UC 2
+abstract class Room {
+    String type;
+    double price;
 
-    public RoomInventory() {
-        this.inventory = new HashMap<>();
+    public Room(String type, double price) {
+        this.type = type;
+        this.price = price;
     }
 
-    // Step 2: Register room types with counts
-    public void registerRoom(String roomType, int initialCount) {
-        inventory.put(roomType, initialCount);
-    }
+    public abstract String getFeatures();
+}
 
-    // Step 4: Controlled methods for updates (Booking/Cancellations)
-    public void updateAvailability(String roomType, int change) {
-        if (inventory.containsKey(roomType)) {
-            int currentCount = inventory.get(roomType);
-            inventory.put(roomType, currentCount + change);
-        } else {
-            System.out.println("Error: Room type '" + roomType + "' not found in inventory.");
+class StandardRoom extends Room {
+    public StandardRoom() { super("Standard", 1500.0); }
+    @Override public String getFeatures() { return "Twin Bed, Non-AC"; }
+}
+
+class DeluxeRoom extends Room {
+    public DeluxeRoom() { super("Deluxe", 3000.0); }
+    @Override public String getFeatures() { return "King Bed, AC, Wifi"; }
+}
+
+// Search Service - The "Read-Only" Logic Layer
+class SearchService {
+    // This service needs access to the Inventory and the Room details
+    public void searchAvailableRooms(HashMap<String, Integer> inventory, Map<String, Room> roomDetails) {
+        System.out.println("\n--- Available Rooms for Your Stay ---");
+        boolean found = false;
+
+        for (String type : inventory.keySet()) {
+            int count = inventory.get(type);
+
+            // UC 4 Requirement: Filter out unavailable rooms
+            if (count > 0) {
+                Room room = roomDetails.get(type);
+                System.out.println("Room Type: " + type);
+                System.out.println("  > Price: ₹" + room.price);
+                System.out.println("  > Features: " + room.getFeatures());
+                System.out.println("  > Status: " + count + " rooms left");
+                System.out.println("------------------------------------");
+                found = true;
+            }
         }
-    }
 
-    // Step 3 & 5: Retrieve and Display current state
-    public void displayInventory() {
-        System.out.println("----- Current Room Inventory -----");
-        for (Map.Entry<String, Integer> entry : inventory.entrySet()) {
-            System.out.println("Room: " + entry.getKey() + " | Available: " + entry.getValue());
+        if (!found) {
+            System.out.println("Sorry, no rooms are currently available.");
         }
-        System.out.println("----------------------------------");
     }
 }
 
-// Updated Application Entry
 public class BookMyStayApp {
     public static void main(String[] args) {
-        // Step 1: Initialize the inventory component
-        RoomInventory myInventory = new RoomInventory();
+        // 1. Initialize Inventory (From UC 3)
+        HashMap<String, Integer> inventory = new HashMap<>();
+        inventory.put("Standard", 5);
+        inventory.put("Deluxe", 0); // This one should be filtered out!
 
-        // Step 2: Register Rooms
-        myInventory.registerRoom("Standard", 10);
-        myInventory.registerRoom("Deluxe", 5);
-        myInventory.registerRoom("Suite", 2);
+        // 2. Initialize Room Objects (From UC 2)
+        Map<String, Room> roomDetails = new HashMap<>();
+        roomDetails.put("Standard", new StandardRoom());
+        roomDetails.put("Deluxe", new DeluxeRoom());
 
-        // Initial State
-        myInventory.displayInventory();
+        // 3. Guest Initiates Search
+        SearchService searchService = new SearchService();
+        searchService.searchAvailableRooms(inventory, roomDetails);
 
-        // Step 4: Simulate a booking (Update)
-        System.out.println("\nAction: Booking 1 Deluxe Room...");
-        myInventory.updateAvailability("Deluxe", -1);
-
-        // Final State
-        myInventory.displayInventory();
+        System.out.println("\n(Search Complete: System state remains unchanged)");
     }
 }
