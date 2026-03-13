@@ -1,83 +1,75 @@
 import java.util.*;
 
-// Represents a Finalized Booking
-class Reservation {
-    String reservationId;
-    String guestName;
-    String roomType;
-    String roomId;
+// 1. Add-On Service - Represents an individual offering
+class AddOnService {
+    private String serviceName;
+    private double price;
 
-    public Reservation(String guestName, String roomType, String roomId) {
-        this.reservationId = "RES-" + UUID.randomUUID().toString().substring(0, 5).toUpperCase();
-        this.guestName = guestName;
-        this.roomType = roomType;
-        this.roomId = roomId;
+    public AddOnService(String serviceName, double price) {
+        this.serviceName = serviceName;
+        this.price = price;
     }
+
+    public String getServiceName() { return serviceName; }
+    public double getPrice() { return price; }
 
     @Override
     public String toString() {
-        return "Reservation ID: " + reservationId + " | Guest: " + guestName + " | Room: " + roomType + " | Room ID: " + roomId;
+        return serviceName + " (₹" + price + ")";
     }
 }
 
-// Booking Service - The "Engine" that processes requests
-class BookingService {
-    private RoomInventory inventory;
-    private Set<String> assignedRoomIds; // To ensure unique room IDs (Step 4)
-    private int idCounter = 101; // Simple counter for Room IDs
+// 2. Add-On Service Manager - Manages the association
+class AddOnManager {
+    // Map linking Reservation ID -> List of Selected Services
+    private Map<String, List<AddOnService>> reservationAddOns;
 
-    public BookingService(RoomInventory inventory) {
-        this.inventory = inventory;
-        this.assignedRoomIds = new HashSet<>();
+    public AddOnManager() {
+        this.reservationAddOns = new HashMap<>();
     }
 
-    // Step 1: Dequeue and Process
-    public void processRequest(BookingRequest request) {
-        System.out.println("\nProcessing: " + request);
+    // Step 1, 2 & 3: Mapping services to a Reservation ID
+    public void addServicesToReservation(String reservationId, List<AddOnService> services) {
+        reservationAddOns.put(reservationId, new ArrayList<>(services));
+        System.out.println("System: Add-ons linked to " + reservationId);
+    }
 
-        // Step 2: Check Availability
-        if (inventory.getAvailability(request.getRoomType()) > 0) {
-
-            // Step 3 & 4: Generate and Record Unique Room ID
-            String newRoomId = request.getRoomType().substring(0, 1).toUpperCase() + idCounter++;
-            assignedRoomIds.add(newRoomId);
-
-            // Step 5: Decrement Inventory immediately
-            inventory.updateAvailability(request.getRoomType(), -1);
-
-            // Step 6: Confirm Reservation
-            Reservation confirmed = new Reservation(request.getGuestName(), request.getRoomType(), newRoomId);
-            System.out.println("SUCCESS: " + confirmed);
-        } else {
-            System.out.println("FAILED: No availability for " + request.getRoomType());
+    // Step 4: Calculate additional costs
+    public double calculateExtraCost(String reservationId) {
+        double total = 0;
+        List<AddOnService> services = reservationAddOns.getOrDefault(reservationId, new ArrayList<>());
+        for (AddOnService s : services) {
+            total += s.getPrice();
         }
+        return total;
+    }
+
+    public void displayAddOns(String reservationId) {
+        System.out.println("Add-ons for " + reservationId + ": " +
+                reservationAddOns.getOrDefault(reservationId, Collections.emptyList()));
     }
 }
 
 public class BookMyStayApp {
     public static void main(String[] args) {
-        // Setup Inventory
-        RoomInventory inventory = new RoomInventory();
-        inventory.registerRoom("Deluxe", 1); // Only 1 deluxe room available!
-        inventory.registerRoom("Standard", 5);
+        // Assume we have a confirmed reservation from UC 6
+        String myResId = "RES-A101";
 
-        // Setup Queue with 2 requests for Deluxe
-        BookingQueue queue = new BookingQueue();
-        queue.submitRequest(new BookingRequest("Alice", "Deluxe", 2));
-        queue.submitRequest(new BookingRequest("Bob", "Deluxe", 1)); // This should fail
+        // 1. Guest selects services
+        AddOnService wifi = new AddOnService("High Speed Wifi", 500.0);
+        AddOnService breakfast = new AddOnService("Buffet Breakfast", 1200.0);
 
-        // Initialize Booking Service
-        BookingService service = new BookingService(inventory);
+        List<AddOnService> selected = Arrays.asList(wifi, breakfast);
 
-        // Process Queue (First-Come-First-Served)
-        while (true) {
-            BookingRequest next = queue.getNextRequest();
-            if (next == null) break;
-            service.processRequest(next);
-        }
+        // 2. Initialize Manager and Map Services
+        AddOnManager addOnManager = new AddOnManager();
+        addOnManager.addServicesToReservation(myResId, selected);
 
-        // Final check of inventory
-        System.out.println();
-        inventory.displayInventory();
+        // 3. Display and Calculate Cost
+        addOnManager.displayAddOns(myResId);
+        double extraCharge = addOnManager.calculateExtraCost(myResId);
+
+        System.out.println("Total Additional Cost: ₹" + extraCharge);
+        System.out.println("\n(Note: Core inventory and booking state remain unchanged.)");
     }
 }
