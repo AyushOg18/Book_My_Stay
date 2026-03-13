@@ -1,73 +1,83 @@
-import java.util.LinkedList;
-import java.util.Queue;
+import java.util.*;
 
-// 1. Reservation - Represents a guest's intent
-class BookingRequest {
-    private String guestName;
-    private String roomType;
-    private int numberOfNights;
+// Represents a Finalized Booking
+class Reservation {
+    String reservationId;
+    String guestName;
+    String roomType;
+    String roomId;
 
-    public BookingRequest(String guestName, String roomType, int numberOfNights) {
+    public Reservation(String guestName, String roomType, String roomId) {
+        this.reservationId = "RES-" + UUID.randomUUID().toString().substring(0, 5).toUpperCase();
         this.guestName = guestName;
         this.roomType = roomType;
-        this.numberOfNights = numberOfNights;
+        this.roomId = roomId;
     }
 
     @Override
     public String toString() {
-        return "[Guest: " + guestName + " | Room: " + roomType + " | Stay: " + numberOfNights + " nights]";
+        return "Reservation ID: " + reservationId + " | Guest: " + guestName + " | Room: " + roomType + " | Room ID: " + roomId;
     }
 }
 
-// 2. Booking Request Queue - Manages and orders incoming requests
-class BookingQueue {
-    // Using LinkedList as the underlying structure for the Queue
-    private Queue<BookingRequest> requestQueue;
+// Booking Service - The "Engine" that processes requests
+class BookingService {
+    private RoomInventory inventory;
+    private Set<String> assignedRoomIds; // To ensure unique room IDs (Step 4)
+    private int idCounter = 101; // Simple counter for Room IDs
 
-    public BookingQueue() {
-        this.requestQueue = new LinkedList<>();
+    public BookingService(RoomInventory inventory) {
+        this.inventory = inventory;
+        this.assignedRoomIds = new HashSet<>();
     }
 
-    // Step 2 & 3: Add request and preserve arrival order
-    public void submitRequest(BookingRequest request) {
-        requestQueue.add(request);
-        System.out.println("System: Request received from " + request);
-    }
+    // Step 1: Dequeue and Process
+    public void processRequest(BookingRequest request) {
+        System.out.println("\nProcessing: " + request);
 
-    // Step 5: Display state (No inventory mutation occurs here)
-    public void displayQueueStatus() {
-        System.out.println("\n--- Current Booking Queue (Waiting for Allocation) ---");
-        if (requestQueue.isEmpty()) {
-            System.out.println("Queue is empty.");
+        // Step 2: Check Availability
+        if (inventory.getAvailability(request.getRoomType()) > 0) {
+
+            // Step 3 & 4: Generate and Record Unique Room ID
+            String newRoomId = request.getRoomType().substring(0, 1).toUpperCase() + idCounter++;
+            assignedRoomIds.add(newRoomId);
+
+            // Step 5: Decrement Inventory immediately
+            inventory.updateAvailability(request.getRoomType(), -1);
+
+            // Step 6: Confirm Reservation
+            Reservation confirmed = new Reservation(request.getGuestName(), request.getRoomType(), newRoomId);
+            System.out.println("SUCCESS: " + confirmed);
         } else {
-            for (BookingRequest req : requestQueue) {
-                System.out.println("Pending -> " + req);
-            }
+            System.out.println("FAILED: No availability for " + request.getRoomType());
         }
-        System.out.println("------------------------------------------------------");
-    }
-
-    // This will be used in the next UC to process the requests
-    public BookingRequest getNextRequest() {
-        return requestQueue.poll();
     }
 }
 
 public class BookMyStayApp {
     public static void main(String[] args) {
-        // Initialize the Queue System
-        BookingQueue hotelQueue = new BookingQueue();
+        // Setup Inventory
+        RoomInventory inventory = new RoomInventory();
+        inventory.registerRoom("Deluxe", 1); // Only 1 deluxe room available!
+        inventory.registerRoom("Standard", 5);
 
-        // Step 1: Guests submit booking requests
-        System.out.println("Action: Guests are submitting requests...\n");
+        // Setup Queue with 2 requests for Deluxe
+        BookingQueue queue = new BookingQueue();
+        queue.submitRequest(new BookingRequest("Alice", "Deluxe", 2));
+        queue.submitRequest(new BookingRequest("Bob", "Deluxe", 1)); // This should fail
 
-        hotelQueue.submitRequest(new BookingRequest("Alice", "Deluxe", 2));
-        hotelQueue.submitRequest(new BookingRequest("Bob", "Standard", 1));
-        hotelQueue.submitRequest(new BookingRequest("Charlie", "Deluxe", 3));
+        // Initialize Booking Service
+        BookingService service = new BookingService(inventory);
 
-        // Step 4 & 5: Display current state (Order is preserved: Alice -> Bob -> Charlie)
-        hotelQueue.displayQueueStatus();
+        // Process Queue (First-Come-First-Served)
+        while (true) {
+            BookingRequest next = queue.getNextRequest();
+            if (next == null) break;
+            service.processRequest(next);
+        }
 
-        System.out.println("\nNote: Inventory has not been changed yet. Requests are only queued.");
+        // Final check of inventory
+        System.out.println();
+        inventory.displayInventory();
     }
 }
