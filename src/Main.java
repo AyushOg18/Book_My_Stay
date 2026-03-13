@@ -1,31 +1,55 @@
-import java.util.Scanner;
+// Step 1: Abstraction - Defining the "Idea" of a Room
+abstract class Room {
+    String roomType;
+    double pricePerNight;
+    int availableRooms; // Simple variable for availability
 
+    public Room(String roomType, double pricePerNight, int availableRooms) {
+        this.roomType = roomType;
+        this.pricePerNight = pricePerNight;
+        this.availableRooms = availableRooms;
+    }
+
+    // Abstract method: Every subclass must define how to display itself
+    public abstract void displayRoomDetails();
+}
+
+// Step 2: Inheritance - Specific Room Types
+class StandardRoom extends Room {
+    public StandardRoom(int availability) {
+        super("Standard Room", 1500.0, availability);
+    }
+
+    @Override
+    public void displayRoomDetails() {
+        System.out.println("Type: " + roomType + " | Price: ₹" + pricePerNight + " | Available: " + availableRooms);
+    }
+}
+
+class DeluxeRoom extends Room {
+    public DeluxeRoom(int availability) {
+        super("Deluxe Room", 3000.0, availability);
+    }
+
+    @Override
+    public void displayRoomDetails() {
+        System.out.println("Type: " + roomType + " | Price: ₹" + pricePerNight + " | Available: " + availableRooms + " (Includes AC & Breakfast)");
+    }
+}
+
+// Step 3: Application Entry
 public class BookMyStayApp {
-
     public static void main(String[] args) {
-        // Initialize the welcome message and entry point
-        displayWelcomeMessage();
+        System.out.println("=== BookMyStay: Room Availability ===\n");
 
-        // Potential next step: Displaying a menu or asking for user input
-        showMainMenu();
-    }
+        // Creating Room objects as per UC 2 Flow
+        Room standard = new StandardRoom(5);
+        Room deluxe = new DeluxeRoom(2);
 
-    /**
-     * Requirement: UC 1 - Application Entry & Welcome Message
-     */
-    public static void displayWelcomeMessage() {
-        System.out.println("=============================================");
-        System.out.println("      WELCOME TO THE BOOK MY STAY APP        ");
-        System.out.println("      Your Comfort, Our Priority!            ");
-        System.out.println("=============================================");
-        System.out.println("System Initialized... Ready to assist you.\n");
-    }
+        // Printing details to console
+        standard.displayRoomDetails();
+        deluxe.displayRoomDetails();
 
-    public static void showMainMenu() {
-        System.out.println("How can we help you today?");
-        System.out.println("1. View Available Hotels");
-        System.out.println("2. Check Booking Status");
-        System.out.println("3. Exit");
-        System.out.print("\nPlease enter your choice: ");
+        System.out.println("\nApplication Terminated.");
     }
 }
