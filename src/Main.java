@@ -1,69 +1,56 @@
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Scanner;
 
-// 1. Booking History - Maintains the record of confirmed reservations
-class BookingHistory {
-    private List<Reservation> confirmedReservations;
-
-    public BookingHistory() {
-        this.confirmedReservations = new ArrayList<>();
-    }
-
-    // Step 1 & 2: Record confirmed booking
-    public void recordReservation(Reservation reservation) {
-        confirmedReservations.add(reservation);
-    }
-
-    // Step 5: Retrieve all records
-    public List<Reservation> getAllRecords() {
-        return new ArrayList<>(confirmedReservations); // Return copy for safety
+// Custom Exception for specific domain errors
+class BookingValidationException extends Exception {
+    public BookingValidationException(String message) {
+        super(message);
     }
 }
 
-// 2. Booking Report Service - Generates summaries
-class BookingReportService {
-    private BookingHistory history;
+// Validator Service - Acts as a Gatekeeper
+class BookingValidator {
 
-    public BookingReportService(BookingHistory history) {
-        this.history = history;
-    }
+    public static void validateRequest(String guestName, int nights, int availability)
+            throws BookingValidationException {
 
-    // Step 4 & 5: Generate Report
-    public void generateSummaryReport() {
-        List<Reservation> records = history.getAllRecords();
-
-        System.out.println("\n========== ADMIN OPERATIONAL REPORT ==========");
-        System.out.println("Total Bookings Processed: " + records.size());
-
-        if (records.isEmpty()) {
-            System.out.println("No data available for reporting.");
-        } else {
-            for (Reservation res : records) {
-                // Formatting the report for the Admin
-                System.out.println("[ID: " + res.reservationId + "] Guest: " +
-                        res.guestName + " | Room: " + res.roomId);
-            }
+        // 1. Validate Input Values
+        if (guestName == null || guestName.trim().isEmpty()) {
+            throw new BookingValidationException("Error: Guest name cannot be empty.");
         }
-        System.out.println("===============================================");
+
+        if (nights <= 0) {
+            throw new BookingValidationException("Error: Stay duration must be at least 1 night.");
+        }
+
+        // 2. Validate System Constraints
+        if (availability <= 0) {
+            throw new BookingValidationException("Error: Selected room type is currently Sold Out.");
+        }
     }
 }
 
-// Updated main logic to show integration
 public class BookMyStayApp {
     public static void main(String[] args) {
-        // 1. Initialize History and Reporting
-        BookingHistory history = new BookingHistory();
-        BookingReportService reportService = new BookingReportService(history);
+        // Mock Data for testing
+        String inputName = ""; // Invalid
+        int inputNights = -2;  // Invalid
+        int currentAvailability = 0; // Sold Out
 
-        // 2. Simulate successful confirmations (from UC 6)
-        Reservation res1 = new Reservation("Alice", "Deluxe", "D101");
-        Reservation res2 = new Reservation("Charlie", "Standard", "S105");
+        System.out.println("--- Initiating Booking Validation ---");
 
-        // 3. Add to history
-        history.recordReservation(res1);
-        history.recordReservation(res2);
+        try {
+            // Step 2: System validates input values and constraints
+            BookingValidator.validateRequest(inputName, inputNights, currentAvailability);
 
-        // 4. Admin requests a report
-        reportService.generateSummaryReport();
+            // This part only runs if validation passes
+            System.out.println("Validation Passed! Proceeding to Queue...");
+
+        } catch (BookingValidationException e) {
+            // Step 3 & 4: Error is raised and meaningful message is displayed
+            System.err.println("VALIDATION FAILED: " + e.getMessage());
+        }
+
+        // Step 5: System continues running safely
+        System.out.println("\nSystem Status: Online. Ready for next request.");
     }
 }
