@@ -1,94 +1,71 @@
+import java.io.*;
 import java.util.*;
 
-// Service to handle the Rollback logic
-class CancellationService {
-    private RoomInventory inventory;
-    private BookingHistory history;
+// 1. Make sure all domain objects are Serializable
+// Apply 'implements Serializable' to RoomInventory, Reservation, etc.
 
-    public CancellationService(RoomInventory inventory, BookingHistory history) {
-        this.inventory = inventory;
-        this.history = history;
-    }
+class PersistenceService {
+    private static final String STORAGE_FILE = "hotel_state.ser";
 
-    // Step 2: Validate and Process Cancellation
-    public void processCancellation(String resId) {
-        System.out.println("\nInitiating Cancellation for: " + resId);
+    // Step 2 & 3: Serialization & Writing to file
+    public void saveSystemState(RoomInventory inventory, List<Reservation> history) {
+        try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(STORAGE_FILE))) {
+            Map<String, Object> state = new HashMap<>();
+            state.put("inventory", inventory);
+            state.put("history", history);
 
-        // Find the reservation in history
-        Reservation target = findReservation(resId);
-
-        if (target != null) {
-            // Step 3: Record details for rollback (Already in 'target' object)
-            String roomType = target.roomType;
-            String roomId = target.roomId;
-
-            // Step 4: Increment Inventory (Rollback the decrement from UC 6)
-            inventory.updateAvailability(roomType, 1);
-            System.out.println("Rollback: Inventory for " + roomType + " incremented (+1).");
-
-            // Step 5: Update history state
-            target.status = "CANCELLED"; // Assuming status field added to Reservation
-            System.out.println("Success: Room " + roomId + " is now vacant.");
-        } else {
-            // Step 3 (Error Path): Meaningful failure message
-            System.out.println("Error: Cancellation failed. Reservation ID " + resId + " not found.");
+            oos.writeObject(state);
+            System.out.println("System: State successfully persisted to " + STORAGE_FILE);
+        } catch (IOException e) {
+            System.err.println("Error: Persistence failed - " + e.getMessage());
         }
     }
 
-    private Reservation findReservation(String resId) {
-        for (Reservation res : history.getAllRecords()) {
-            if (res.reservationId.equals(resId)) {
-                return res;
-            }
+    // Step 5 & 6: Loading & Restoring state
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> loadSystemState() {
+        File file = new File(STORAGE_FILE);
+        if (!file.exists()) {
+            System.out.println("System: No previous state found. Starting fresh.");
+            return null;
         }
-        return null;
-    }
-}
 
-// Updated Reservation Class to support state tracking
-class Reservation {
-    String reservationId;
-    String guestName;
-    String roomType;
-    String roomId;
-    String status; // New field for UC 10
-
-    public Reservation(String guestName, String roomType, String roomId) {
-        this.reservationId = "RES-" + UUID.randomUUID().toString().substring(0, 5).toUpperCase();
-        this.guestName = guestName;
-        this.roomType = roomType;
-        this.roomId = roomId;
-        this.status = "CONFIRMED";
-    }
-
-    @Override
-    public String toString() {
-        return String.format("[%s] %s | Room: %s (%s)", status, reservationId, roomId, roomType);
+        try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(file))) {
+            System.out.println("System: Previous state found. Restoring data...");
+            return (Map<String, Object>) ois.readObject();
+        } catch (IOException | ClassNotFoundException e) {
+            System.err.println("Error: Recovery failed - " + e.getMessage());
+            return null;
+        }
     }
 }
 
 public class BookMyStayApp {
     public static void main(String[] args) {
-        // Setup initial system state
-        RoomInventory inventory = new RoomInventory();
-        inventory.registerRoom("Deluxe", 2);
-        BookingHistory history = new BookingHistory();
+        PersistenceService persistence = new PersistenceService();
+        RoomInventory inventory;
+        List<Reservation> history;
 
-        // Simulate a confirmed booking
-        Reservation res = new Reservation("John Doe", "Deluxe", "D101");
-        history.recordReservation(res);
-        inventory.updateAvailability("Deluxe", -1); // Room was taken
+        // Step 4 & 5: Restart Logic (Try to load)
+        Map<String, Object> restoredState = persistence.loadSystemState();
 
-        System.out.println("Initial State:");
+        if (restoredState != null) {
+            inventory = (RoomInventory) restoredState.get("inventory");
+            history = (List<Reservation>) restoredState.get("history");
+        } else {
+            // Fresh Initialization if no file exists
+            inventory = new RoomInventory();
+            inventory.registerRoom("Standard", 10);
+            history = new ArrayList<>();
+        }
+
+        // --- Simulate App Usage ---
+        System.out.println("Current Inventory: ");
         inventory.displayInventory();
 
-        // UC 10 Flow: Guest cancels
-        CancellationService cancelService = new CancellationService(inventory, history);
-        cancelService.processCancellation(res.reservationId);
-
-        // Step 6: Verify restored state
-        System.out.println("\nRestored State:");
-        inventory.displayInventory();
-        System.out.println("History: " + res);
+        // Step 1: Prepare for Shutdown (Simulate)
+        System.out.println("\nAction: Shutting down system...");
+        persistence.saveSystemState(inventory, history);
+        System.out.println("Application Terminated Safely.");
     }
 }
