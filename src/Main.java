@@ -1,64 +1,71 @@
+import java.io.*;
 import java.util.*;
-import java.util.concurrent.*;
 
-// 1. Thread-Safe Room Inventory
-class ThreadSafeInventory extends RoomInventory {
-    // We synchronize this method to prevent Race Conditions
-    @Override
-    public synchronized void updateAvailability(String roomType, int change) {
-        super.updateAvailability(roomType, change);
+// 1. Make sure all domain objects are Serializable
+// Apply 'implements Serializable' to RoomInventory, Reservation, etc.
+
+class PersistenceService {
+    private static final String STORAGE_FILE = "hotel_state.ser";
+
+    // Step 2 & 3: Serialization & Writing to file
+    public void saveSystemState(RoomInventory inventory, List<Reservation> history) {
+        try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(STORAGE_FILE))) {
+            Map<String, Object> state = new HashMap<>();
+            state.put("inventory", inventory);
+            state.put("history", history);
+
+            oos.writeObject(state);
+            System.out.println("System: State successfully persisted to " + STORAGE_FILE);
+        } catch (IOException e) {
+            System.err.println("Error: Persistence failed - " + e.getMessage());
+        }
     }
 
-    @Override
-    public synchronized int getAvailability(String roomType) {
-        return super.getAvailability(roomType);
-    }
-}
+    // Step 5 & 6: Loading & Restoring state
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> loadSystemState() {
+        File file = new File(STORAGE_FILE);
+        if (!file.exists()) {
+            System.out.println("System: No previous state found. Starting fresh.");
+            return null;
+        }
 
-// 2. Concurrent Processor - Simulating multiple users at once
-class BookingTask implements Runnable {
-    private String guestName;
-    private String roomType;
-    private BookingService bookingService;
-
-    public BookingTask(String name, String type, BookingService service) {
-        this.guestName = name;
-        this.roomType = type;
-        this.bookingService = service;
-    }
-
-    @Override
-    public void run() {
-        // Simulating the booking request flow in a thread
-        BookingRequest request = new BookingRequest(guestName, roomType, 1);
-        bookingService.processRequest(request);
+        try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(file))) {
+            System.out.println("System: Previous state found. Restoring data...");
+            return (Map<String, Object>) ois.readObject();
+        } catch (IOException | ClassNotFoundException e) {
+            System.err.println("Error: Recovery failed - " + e.getMessage());
+            return null;
+        }
     }
 }
 
 public class BookMyStayApp {
-    public static void main(String[] args) throws InterruptedException {
-        // Initialize Thread-Safe components
-        ThreadSafeInventory inventory = new ThreadSafeInventory();
-        inventory.registerRoom("Suite", 1); // ONLY 1 SUITE AVAILABLE
+    public static void main(String[] args) {
+        PersistenceService persistence = new PersistenceService();
+        RoomInventory inventory;
+        List<Reservation> history;
 
-        BookingHistory history = new BookingHistory();
-        BookingService service = new BookingService(inventory);
+        // Step 4 & 5: Restart Logic (Try to load)
+        Map<String, Object> restoredState = persistence.loadSystemState();
 
-        System.out.println("--- Starting Concurrent Booking Simulation ---");
-        System.out.println("Available Suites: " + inventory.getAvailability("Suite"));
+        if (restoredState != null) {
+            inventory = (RoomInventory) restoredState.get("inventory");
+            history = (List<Reservation>) restoredState.get("history");
+        } else {
+            // Fresh Initialization if no file exists
+            inventory = new RoomInventory();
+            inventory.registerRoom("Standard", 10);
+            history = new ArrayList<>();
+        }
 
-        // Creating a Thread Pool to simulate 3 users clicking 'Book' at the same time
-        ExecutorService executor = Executors.newFixedThreadPool(3);
-
-        executor.execute(new BookingTask("Alice", "Suite", service));
-        executor.execute(new BookingTask("Bob", "Suite", service));
-        executor.execute(new BookingTask("Charlie", "Suite", service));
-
-        executor.shutdown();
-        executor.awaitTermination(5, TimeUnit.SECONDS);
-
-        // Final verification
-        System.out.println("\n--- Final System State ---");
+        // --- Simulate App Usage ---
+        System.out.println("Current Inventory: ");
         inventory.displayInventory();
+
+        // Step 1: Prepare for Shutdown (Simulate)
+        System.out.println("\nAction: Shutting down system...");
+        persistence.saveSystemState(inventory, history);
+        System.out.println("Application Terminated Safely.");
     }
 }
