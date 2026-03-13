@@ -1,73 +1,73 @@
-import java.util.HashMap;
-import java.util.Map;
+import java.util.LinkedList;
+import java.util.Queue;
 
-// Base Room class from UC 2
-abstract class Room {
-    String type;
-    double price;
+// 1. Reservation - Represents a guest's intent
+class BookingRequest {
+    private String guestName;
+    private String roomType;
+    private int numberOfNights;
 
-    public Room(String type, double price) {
-        this.type = type;
-        this.price = price;
+    public BookingRequest(String guestName, String roomType, int numberOfNights) {
+        this.guestName = guestName;
+        this.roomType = roomType;
+        this.numberOfNights = numberOfNights;
     }
 
-    public abstract String getFeatures();
+    @Override
+    public String toString() {
+        return "[Guest: " + guestName + " | Room: " + roomType + " | Stay: " + numberOfNights + " nights]";
+    }
 }
 
-class StandardRoom extends Room {
-    public StandardRoom() { super("Standard", 1500.0); }
-    @Override public String getFeatures() { return "Twin Bed, Non-AC"; }
-}
+// 2. Booking Request Queue - Manages and orders incoming requests
+class BookingQueue {
+    // Using LinkedList as the underlying structure for the Queue
+    private Queue<BookingRequest> requestQueue;
 
-class DeluxeRoom extends Room {
-    public DeluxeRoom() { super("Deluxe", 3000.0); }
-    @Override public String getFeatures() { return "King Bed, AC, Wifi"; }
-}
+    public BookingQueue() {
+        this.requestQueue = new LinkedList<>();
+    }
 
-// Search Service - The "Read-Only" Logic Layer
-class SearchService {
-    // This service needs access to the Inventory and the Room details
-    public void searchAvailableRooms(HashMap<String, Integer> inventory, Map<String, Room> roomDetails) {
-        System.out.println("\n--- Available Rooms for Your Stay ---");
-        boolean found = false;
+    // Step 2 & 3: Add request and preserve arrival order
+    public void submitRequest(BookingRequest request) {
+        requestQueue.add(request);
+        System.out.println("System: Request received from " + request);
+    }
 
-        for (String type : inventory.keySet()) {
-            int count = inventory.get(type);
-
-            // UC 4 Requirement: Filter out unavailable rooms
-            if (count > 0) {
-                Room room = roomDetails.get(type);
-                System.out.println("Room Type: " + type);
-                System.out.println("  > Price: ₹" + room.price);
-                System.out.println("  > Features: " + room.getFeatures());
-                System.out.println("  > Status: " + count + " rooms left");
-                System.out.println("------------------------------------");
-                found = true;
+    // Step 5: Display state (No inventory mutation occurs here)
+    public void displayQueueStatus() {
+        System.out.println("\n--- Current Booking Queue (Waiting for Allocation) ---");
+        if (requestQueue.isEmpty()) {
+            System.out.println("Queue is empty.");
+        } else {
+            for (BookingRequest req : requestQueue) {
+                System.out.println("Pending -> " + req);
             }
         }
+        System.out.println("------------------------------------------------------");
+    }
 
-        if (!found) {
-            System.out.println("Sorry, no rooms are currently available.");
-        }
+    // This will be used in the next UC to process the requests
+    public BookingRequest getNextRequest() {
+        return requestQueue.poll();
     }
 }
 
 public class BookMyStayApp {
     public static void main(String[] args) {
-        // 1. Initialize Inventory (From UC 3)
-        HashMap<String, Integer> inventory = new HashMap<>();
-        inventory.put("Standard", 5);
-        inventory.put("Deluxe", 0); // This one should be filtered out!
+        // Initialize the Queue System
+        BookingQueue hotelQueue = new BookingQueue();
 
-        // 2. Initialize Room Objects (From UC 2)
-        Map<String, Room> roomDetails = new HashMap<>();
-        roomDetails.put("Standard", new StandardRoom());
-        roomDetails.put("Deluxe", new DeluxeRoom());
+        // Step 1: Guests submit booking requests
+        System.out.println("Action: Guests are submitting requests...\n");
 
-        // 3. Guest Initiates Search
-        SearchService searchService = new SearchService();
-        searchService.searchAvailableRooms(inventory, roomDetails);
+        hotelQueue.submitRequest(new BookingRequest("Alice", "Deluxe", 2));
+        hotelQueue.submitRequest(new BookingRequest("Bob", "Standard", 1));
+        hotelQueue.submitRequest(new BookingRequest("Charlie", "Deluxe", 3));
 
-        System.out.println("\n(Search Complete: System state remains unchanged)");
+        // Step 4 & 5: Display current state (Order is preserved: Alice -> Bob -> Charlie)
+        hotelQueue.displayQueueStatus();
+
+        System.out.println("\nNote: Inventory has not been changed yet. Requests are only queued.");
     }
 }
