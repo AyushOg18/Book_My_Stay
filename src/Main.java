@@ -1,55 +1,59 @@
-// Step 1: Abstraction - Defining the "Idea" of a Room
-abstract class Room {
-    String roomType;
-    double pricePerNight;
-    int availableRooms; // Simple variable for availability
+import java.util.HashMap;
+import java.util.Map;
 
-    public Room(String roomType, double pricePerNight, int availableRooms) {
-        this.roomType = roomType;
-        this.pricePerNight = pricePerNight;
-        this.availableRooms = availableRooms;
+// The Centralized Inventory Manager
+class RoomInventory {
+    // Key: Room Type (String), Value: Count (Integer)
+    private HashMap<String, Integer> inventory;
+
+    public RoomInventory() {
+        this.inventory = new HashMap<>();
     }
 
-    // Abstract method: Every subclass must define how to display itself
-    public abstract void displayRoomDetails();
-}
-
-// Step 2: Inheritance - Specific Room Types
-class StandardRoom extends Room {
-    public StandardRoom(int availability) {
-        super("Standard Room", 1500.0, availability);
+    // Step 2: Register room types with counts
+    public void registerRoom(String roomType, int initialCount) {
+        inventory.put(roomType, initialCount);
     }
 
-    @Override
-    public void displayRoomDetails() {
-        System.out.println("Type: " + roomType + " | Price: ₹" + pricePerNight + " | Available: " + availableRooms);
+    // Step 4: Controlled methods for updates (Booking/Cancellations)
+    public void updateAvailability(String roomType, int change) {
+        if (inventory.containsKey(roomType)) {
+            int currentCount = inventory.get(roomType);
+            inventory.put(roomType, currentCount + change);
+        } else {
+            System.out.println("Error: Room type '" + roomType + "' not found in inventory.");
+        }
     }
-}
 
-class DeluxeRoom extends Room {
-    public DeluxeRoom(int availability) {
-        super("Deluxe Room", 3000.0, availability);
-    }
-
-    @Override
-    public void displayRoomDetails() {
-        System.out.println("Type: " + roomType + " | Price: ₹" + pricePerNight + " | Available: " + availableRooms + " (Includes AC & Breakfast)");
+    // Step 3 & 5: Retrieve and Display current state
+    public void displayInventory() {
+        System.out.println("----- Current Room Inventory -----");
+        for (Map.Entry<String, Integer> entry : inventory.entrySet()) {
+            System.out.println("Room: " + entry.getKey() + " | Available: " + entry.getValue());
+        }
+        System.out.println("----------------------------------");
     }
 }
 
-// Step 3: Application Entry
+// Updated Application Entry
 public class BookMyStayApp {
     public static void main(String[] args) {
-        System.out.println("=== BookMyStay: Room Availability ===\n");
+        // Step 1: Initialize the inventory component
+        RoomInventory myInventory = new RoomInventory();
 
-        // Creating Room objects as per UC 2 Flow
-        Room standard = new StandardRoom(5);
-        Room deluxe = new DeluxeRoom(2);
+        // Step 2: Register Rooms
+        myInventory.registerRoom("Standard", 10);
+        myInventory.registerRoom("Deluxe", 5);
+        myInventory.registerRoom("Suite", 2);
 
-        // Printing details to console
-        standard.displayRoomDetails();
-        deluxe.displayRoomDetails();
+        // Initial State
+        myInventory.displayInventory();
 
-        System.out.println("\nApplication Terminated.");
+        // Step 4: Simulate a booking (Update)
+        System.out.println("\nAction: Booking 1 Deluxe Room...");
+        myInventory.updateAvailability("Deluxe", -1);
+
+        // Final State
+        myInventory.displayInventory();
     }
 }
